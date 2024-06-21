@@ -1,0 +1,24 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "your.email@example.com",
+                "Name": "Your Name"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Shows current power usage and charging rate in watts",
+        "Icon": "battery",
+        "Id": "org.kde.plasma.powerusage",
+        "License": "GPL-3.0",
+        "Name": "Energy Usage",
+        "ServiceTypes": [
+            "Plasma/Applet"
+        ],
+        "Version": "1.0",
+        "Website": "https://github.com/magillos/Plasma-6-power-usage-widget"
+    },
+    "X-Plasma-API": "declarativeappletscript",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-MainScript": "ui/main.qml",
+ }
