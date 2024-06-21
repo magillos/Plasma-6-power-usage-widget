@@ -8,4 +8,5 @@ The widget has no configuration options but you can edit /contents/ui/main.qml f
 The widget displays power consumption or charging rate expressed in Watts. If power usage goes above 12W, the colour of the font changes to red.
 Power usage is expressed as negative value. When battery is charging, a bolt symbol is displayed. When battery is fully charged, just the bolt symbol shows. 
 
-You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. 
+You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached. 
+
