@@ -3,7 +3,7 @@
         "Authors": [
             {
                 "Email": "your.email@example.com",
-                "Name": "Your Name"
+                "Name": "magillos"
             }
         ],
         "Category": "System Information",
@@ -11,7 +11,7 @@
         "Icon": "battery",
         "Id": "org.kde.plasma.powerusage",
         "License": "GPL-3.0",
-        "Name": "Energy Usage",
+        "Name": "Power Usage",
         "ServiceTypes": [
             "Plasma/Applet"
         ],
@@ -20,5 +20,5 @@
     },
     "X-Plasma-API": "declarativeappletscript",
     "X-Plasma-API-Minimum-Version": "6.0",
-    "X-Plasma-MainScript": "ui/main.qml",
- }
+    "X-Plasma-MainScript": "ui/main.qml"
+}
