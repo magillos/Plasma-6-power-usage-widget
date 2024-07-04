@@ -8,5 +8,8 @@ The widget shows power consumption or charging rate expressed in Watts.
 Power usage is expressed as negative value. When battery is charging, a bolt symbol is displayed. When battery is fully charged, just the bolt symbol shows. 
 Font and update interval can be set in options. There is also an option to trigger red font when power usage goes above set value. 
 
-~~You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached.~~
 Environmental variable should no longer be required.
+
+~~You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached.~~
+
+
