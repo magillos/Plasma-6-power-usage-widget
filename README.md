@@ -1,4 +1,4 @@
-# Plasma-6-power-usage-widget
+﻿# Plasma-6-power-usage-widget
 
 Sadly, https://github.com/atul-g/plasma-power-monitor widget never got updated to Plasma 6. 
 With mighty help of various LLMs, I made a widget inspired by it. It doesn't share any code with it. I just liked the idea and what it did.
@@ -8,5 +8,5 @@ The widget shows power consumption or charging rate expressed in Watts.
 Power usage is expressed as negative value. When battery is charging, a bolt symbol is displayed. When battery is fully charged, just the bolt symbol shows. 
 Font and update interval can be set in options. There is also an option to trigger red font when power usage goes above set value. 
 
-You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached. 
-
+~~You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached.~~
+Environmental variable should no longer be required.

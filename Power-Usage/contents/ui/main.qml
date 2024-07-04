@@ -3,6 +3,7 @@ import QtQuick.Layouts 1.15
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasmoid 2.0
 import org.kde.kirigami 2.20 as Kirigami
+import org.kde.plasma.plasma5support 2.0 as P5Support
 
 PlasmoidItem {
     id: root
@@ -29,71 +30,100 @@ PlasmoidItem {
         }
     }
     
+    P5Support.DataSource {
+        id: dataSource
+        engine: "executable"
+        connectedSources: []
 
-    
-    function readFile(url, callback) {
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    callback(xhr.responseText.trim());
-                } else {
-                    console.error("Failed to read file:", url);
-                    callback(null);
-                }
+        function readFile(path) {
+            connectSource("cat " + path)
+        }
+
+        onNewData: (sourceName, data) => {
+            var exitCode = data["exit code"]
+            var exitStatus = data["exit status"]
+            var stdout = data["stdout"]
+            var stderr = data["stderr"]
+
+            if (exitCode == 0) {
+                root.processFileContent(sourceName, stdout.trim())
+            } else {
+                console.error("Error reading file:", sourceName, "stderr:", stderr)
+                root.processFileContent(sourceName, null)
             }
-        };
-        xhr.open("GET", url);
-        xhr.send();
+
+            disconnectSource(sourceName)
+        }
     }
     
-   
-    function updateEnergyUsage() {
-        readFile("file:///sys/class/power_supply/BAT0/status", function(statusStr) {
-            var isCharging = statusStr === "Charging";
-            readFile("file:///sys/class/power_supply/BAT0/voltage_now", function(voltageStr) {
-                if (voltageStr === null) {
-                    root.energyText = "Error reading voltage";
-                    root.energyTextColor = Kirigami.Theme.negativeTextColor;
-                    return;
-                }
-                readFile("file:///sys/class/power_supply/BAT0/current_now", function(currentStr) {
-                    if (currentStr === null) {
-                        root.energyText = "Error reading current";
-                        root.energyTextColor = Kirigami.Theme.negativeTextColor;
-                        return;
-                    }
-                    var voltage = parseFloat(voltageStr) / 1000000; 
-                    var current = parseFloat(currentStr) / 1000000; 
-                    var watts = voltage * current;
-                    readFile("file:///sys/class/power_supply/AC/online", function(acOnlineStr) {
-                        var acOnline = parseInt(acOnlineStr, 10) === 1;
-                        
-                        var isFullyCharged = Math.abs(current) < 0.01;
-                        
-                        if (isFullyCharged && acOnline) {
-                            root.energyText = "\u26A1";
-                            root.energyTextColor = Kirigami.Theme.textColor;
-                        } else {
-                            var formattedWatts;
-                            if (acOnline || isCharging) {
-                                formattedWatts = watts.toFixed(1) + "W";
-                                root.energyTextColor = Kirigami.Theme.textColor;
-                            } else {
-                                formattedWatts = "-" + watts.toFixed(1).replace(".", ",") + "W";
-                                var threshold = plasmoid.configuration.wattageThreshold;
-                                root.energyTextColor = watts >= threshold ? "red" : Kirigami.Theme.textColor;
-                            }
-                            
-                            root.energyText = formattedWatts + (isCharging || acOnline ? "\u26A1" : "");
-                        }
-                    });
-                });
-            });
-        });
+    function processFileContent(source, content) {
+        if (source.includes("status")) {
+            var isCharging = content === "Charging"
+            readVoltage()
+        } else if (source.includes("voltage_now")) {
+            if (content === null) {
+                root.energyText = "Error reading voltage"
+                root.energyTextColor = Kirigami.Theme.negativeTextColor
+                return
+            }
+            voltageValue = parseFloat(content) / 1000000
+            readCurrent()
+        } else if (source.includes("current_now")) {
+            if (content === null) {
+                root.energyText = "Error reading current"
+                root.energyTextColor = Kirigami.Theme.negativeTextColor
+                return
+            }
+            currentValue = parseFloat(content) / 1000000
+            readACOnline()
+        } else if (source.includes("AC/online")) {
+            var acOnline = parseInt(content, 10) === 1
+            calculateAndDisplayEnergy(acOnline)
+        }
     }
 
-   Timer {
+    property real voltageValue: 0
+    property real currentValue: 0
+
+    function readVoltage() {
+        dataSource.readFile("/sys/class/power_supply/BAT0/voltage_now")
+    }
+
+    function readCurrent() {
+        dataSource.readFile("/sys/class/power_supply/BAT0/current_now")
+    }
+
+    function readACOnline() {
+        dataSource.readFile("/sys/class/power_supply/AC/online")
+    }
+
+    function calculateAndDisplayEnergy(acOnline) {
+        var watts = voltageValue * currentValue
+        var isFullyCharged = Math.abs(currentValue) < 0.01
+
+        if (isFullyCharged && acOnline) {
+            root.energyText = "\u26A1"
+            root.energyTextColor = Kirigami.Theme.textColor
+        } else {
+            var formattedWatts
+            if (acOnline) {
+                formattedWatts = watts.toFixed(1) + "W"
+                root.energyTextColor = Kirigami.Theme.textColor
+            } else {
+                formattedWatts = "-" + watts.toFixed(1).replace(".", ",") + "W"
+                var threshold = plasmoid.configuration.wattageThreshold
+                root.energyTextColor = watts >= threshold ? "red" : Kirigami.Theme.textColor
+            }
+            
+            root.energyText = formattedWatts + (acOnline ? "\u26A1" : "")
+        }
+    }
+
+    function updateEnergyUsage() {
+        dataSource.readFile("/sys/class/power_supply/BAT0/status")
+    }
+
+    Timer {
         id: updateTimer
         interval: plasmoid.configuration.updateInterval
         running: true
