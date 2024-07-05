@@ -12,4 +12,6 @@ Environmental variable should no longer be required.
 
 ~~You may need to create a file with "export QML_XHR_ALLOW_FILE_READ=1" in it and place it in ~/.config/plasma-workspace/env/. Or use EV.sh file attached.~~
 
+I uploaded widget to https://store.kde.org/p/2173278 so it can now be installed directly from Plasma.
+
 
