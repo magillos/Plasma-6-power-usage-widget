@@ -47,14 +47,22 @@ Item {
             text: i18n("Bold font")
             checked: plasmoid.configuration.fontBold
         }
-
-        QQC2.ComboBox {
-            id: fontFamilyComboBox
-            Kirigami.FormData.label: i18n("Font:")
-            model: Qt.fontFamilies()
-            currentIndex: model.indexOf(plasmoid.configuration.fontFamily) !== -1 ? model.indexOf(plasmoid.configuration.fontFamily) : 0
-            onActivated: cfg_fontFamily = currentText
+        
+QQC2.ComboBox {
+    id: fontFamilyComboBox
+    Kirigami.FormData.label: i18n("Font:")
+    property string systemDefaultText: i18n("Default")
+    model: [systemDefaultText].concat(Qt.fontFamilies())
+    currentIndex: {
+        if (plasmoid.configuration.fontFamily === "") {
+            return 0;
+        } else {
+            var index = model.indexOf(plasmoid.configuration.fontFamily);
+            return index !== -1 ? index : 0;
         }
+    }
+    onActivated: cfg_fontFamily = currentText === systemDefaultText ? "" : currentText
+}
 
         QQC2.SpinBox {
             id: updateIntervalSpinBox
