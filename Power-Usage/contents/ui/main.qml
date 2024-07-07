@@ -10,6 +10,8 @@ PlasmoidItem {
     
     property string energyText: "-- W" 
     property color energyTextColor: Kirigami.Theme.textColor 
+    property string batteryPath: ""
+    property string acAdapterPath: ""
     
     preferredRepresentation: fullRepresentation
     
@@ -62,7 +64,7 @@ PlasmoidItem {
             readVoltage()
         } else if (source.includes("voltage_now")) {
             if (content === null) {
-                root.energyText = "Error reading voltage"
+                root.energyText = "Reading voltage"
                 root.energyTextColor = Kirigami.Theme.negativeTextColor
                 return
             }
@@ -70,13 +72,13 @@ PlasmoidItem {
             readCurrent()
         } else if (source.includes("current_now")) {
             if (content === null) {
-                root.energyText = "Error reading current"
+                root.energyText = "Reading current"
                 root.energyTextColor = Kirigami.Theme.negativeTextColor
                 return
             }
             currentValue = parseFloat(content) / 1000000
             readACOnline()
-        } else if (source.includes("AC/online")) {
+        } else if (source.includes("online")) {
             var acOnline = parseInt(content, 10) === 1
             calculateAndDisplayEnergy(acOnline)
         }
@@ -86,15 +88,19 @@ PlasmoidItem {
     property real currentValue: 0
 
     function readVoltage() {
-        dataSource.readFile("/sys/class/power_supply/BAT0/voltage_now")
+        dataSource.readFile(root.batteryPath + "/voltage_now")
     }
 
     function readCurrent() {
-        dataSource.readFile("/sys/class/power_supply/BAT0/current_now")
+        dataSource.readFile(root.batteryPath + "/current_now")
     }
 
     function readACOnline() {
-        dataSource.readFile("/sys/class/power_supply/AC/online")
+        if (root.acAdapterPath) {
+            dataSource.readFile(root.acAdapterPath + "/online")
+        } else {
+            calculateAndDisplayEnergy(false)  // Assume not plugged in if we can't find AC adapter
+        }
     }
 
     function calculateAndDisplayEnergy(acOnline) {
@@ -119,8 +125,16 @@ PlasmoidItem {
         }
     }
 
+    function findPowerSupplyPaths() {
+        dataSource.connectSource("ls /sys/class/power_supply")
+    }
+
     function updateEnergyUsage() {
-        dataSource.readFile("/sys/class/power_supply/BAT0/status")
+        if (root.batteryPath) {
+            dataSource.readFile(root.batteryPath + "/status")
+        } else {
+            findPowerSupplyPaths()
+        }
     }
 
     Timer {
@@ -132,13 +146,47 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        updateEnergyUsage()
+        findPowerSupplyPaths()
     }
 
     Connections {
         target: plasmoid.configuration
         function onUpdateIntervalChanged() {
             updateTimer.interval = plasmoid.configuration.updateInterval
+        }
+    }
+
+    Connections {
+        target: dataSource
+        function onNewData(sourceName, data) {
+            if (sourceName === "ls /sys/class/power_supply") {
+                var devices = data.stdout.split('\n')
+                var batteries = devices.filter(function(item) {
+                    return item.startsWith('BAT')
+                })
+                var acAdapters = devices.filter(function(item) {
+                    return item.startsWith('AC') || item.startsWith('ADP') || item === 'ACAD' || item.startsWith('USB')
+                })
+
+                if (batteries.length > 0) {
+                    root.batteryPath = "/sys/class/power_supply/" + batteries[0]
+                    console.log("Battery found: " + root.batteryPath)
+                } else {
+                    console.error("No battery found")
+                    root.energyText = "No battery"
+                    root.energyTextColor = Kirigami.Theme.negativeTextColor
+                }
+
+                if (acAdapters.length > 0) {
+                    root.acAdapterPath = "/sys/class/power_supply/" + acAdapters[0]
+                    console.log("AC adapter found: " + root.acAdapterPath)
+                } else {
+                    console.warn("No AC adapter found")
+                }
+
+                updateEnergyUsage()
+                dataSource.disconnectSource(sourceName)
+            }
         }
     }
 }
