@@ -116,7 +116,8 @@ PlasmoidItem {
                 formattedWatts = watts.toFixed(1) + "W"
                 root.energyTextColor = Kirigami.Theme.textColor
             } else {
-                formattedWatts = "-" + watts.toFixed(1).replace(".", ",") + "W"
+               // formattedWatts = "-" + watts.toFixed(1).replace(".", ",") + "W" // use this if you prefer coma and remove the line below. I wasn't able to force it other way. YMMV
+                formattedWatts = "-" + watts.toFixed(1) + "W"
                 var threshold = plasmoid.configuration.wattageThreshold
                 root.energyTextColor = watts >= threshold ? "red" : Kirigami.Theme.textColor
             }
