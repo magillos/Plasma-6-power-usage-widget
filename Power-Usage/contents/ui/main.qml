@@ -113,11 +113,10 @@ PlasmoidItem {
         } else {
             var formattedWatts
             if (acOnline) {
-                formattedWatts = watts.toFixed(1) + "W"
+                formattedWatts = watts.toLocaleString(Qt.locale(), 'f', 1) + "W"
                 root.energyTextColor = Kirigami.Theme.textColor
             } else {
-               // formattedWatts = "-" + watts.toFixed(1).replace(".", ",") + "W" // use this if you prefer coma and remove the line below. I wasn't able to force it other way. YMMV
-                formattedWatts = "-" + watts.toFixed(1) + "W"
+                formattedWatts = "-" + Math.abs(watts).toLocaleString(Qt.locale(), 'f', 1) + "W"
                 var threshold = plasmoid.configuration.wattageThreshold
                 root.energyTextColor = watts >= threshold ? "red" : Kirigami.Theme.textColor
             }
@@ -125,6 +124,7 @@ PlasmoidItem {
             root.energyText = formattedWatts + (acOnline ? "\u26A1" : "")
         }
     }
+
 
     function findPowerSupplyPaths() {
         dataSource.connectSource("ls /sys/class/power_supply")
