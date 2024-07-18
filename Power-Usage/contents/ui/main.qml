@@ -12,6 +12,7 @@ PlasmoidItem {
     property color energyTextColor: Kirigami.Theme.textColor 
     property string batteryPath: ""
     property string acAdapterPath: ""
+    property bool hasPowerNow: false
     
     preferredRepresentation: fullRepresentation
     
@@ -61,7 +62,11 @@ PlasmoidItem {
     function processFileContent(source, content) {
         if (source.includes("status")) {
             var isCharging = content === "Charging"
-            readVoltage()
+            if (root.hasPowerNow) {
+                readPowerNow()
+            } else {
+                readVoltage()
+            }
         } else if (source.includes("voltage_now")) {
             if (content === null) {
                 root.energyText = "Reading voltage"
@@ -78,6 +83,14 @@ PlasmoidItem {
             }
             currentValue = parseFloat(content) / 1000000
             readACOnline()
+        } else if (source.includes("power_now")) {
+            if (content === null) {
+                root.energyText = "Reading power"
+                root.energyTextColor = Kirigami.Theme.negativeTextColor
+                return
+            }
+            powerValue = parseFloat(content) / 1000000
+            readACOnline()
         } else if (source.includes("online")) {
             var acOnline = parseInt(content, 10) === 1
             calculateAndDisplayEnergy(acOnline)
@@ -86,6 +99,7 @@ PlasmoidItem {
 
     property real voltageValue: 0
     property real currentValue: 0
+    property real powerValue: 0
 
     function readVoltage() {
         dataSource.readFile(root.batteryPath + "/voltage_now")
@@ -93,6 +107,10 @@ PlasmoidItem {
 
     function readCurrent() {
         dataSource.readFile(root.batteryPath + "/current_now")
+    }
+
+    function readPowerNow() {
+        dataSource.readFile(root.batteryPath + "/power_now")
     }
 
     function readACOnline() {
@@ -104,8 +122,8 @@ PlasmoidItem {
     }
 
     function calculateAndDisplayEnergy(acOnline) {
-        var watts = voltageValue * currentValue
-        var isFullyCharged = Math.abs(currentValue) < 0.01
+        var watts = root.hasPowerNow ? powerValue : voltageValue * currentValue
+        var isFullyCharged = root.hasPowerNow ? (watts < 0.1) : (Math.abs(currentValue) < 0.01)
 
         if (isFullyCharged && acOnline) {
             root.energyText = "\u26A1"
@@ -124,7 +142,6 @@ PlasmoidItem {
             root.energyText = formattedWatts + (acOnline ? "\u26A1" : "")
         }
     }
-
 
     function findPowerSupplyPaths() {
         dataSource.connectSource("ls /sys/class/power_supply")
@@ -166,12 +183,15 @@ PlasmoidItem {
                     return item.startsWith('BAT')
                 })
                 var acAdapters = devices.filter(function(item) {
-                    return item.startsWith('AC') || item.startsWith('ADP') || item === 'ACAD' || item.startsWith('USB')
+                    return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
                 if (batteries.length > 0) {
                     root.batteryPath = "/sys/class/power_supply/" + batteries[0]
                     console.log("Battery found: " + root.batteryPath)
+                    
+                    // Check if power_now file exists
+                    dataSource.connectSource("ls " + root.batteryPath + "/power_now")
                 } else {
                     console.error("No battery found")
                     root.energyText = "No battery"
@@ -186,6 +206,10 @@ PlasmoidItem {
                 }
 
                 updateEnergyUsage()
+                dataSource.disconnectSource(sourceName)
+            } else if (sourceName.includes("/power_now")) {
+                root.hasPowerNow = (data["exit code"] === 0)
+                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
                 dataSource.disconnectSource(sourceName)
             }
         }
