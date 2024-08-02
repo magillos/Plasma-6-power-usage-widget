@@ -13,6 +13,7 @@ PlasmoidItem {
     property string batteryPath: ""
     property string acAdapterPath: ""
     property bool hasPowerNow: false
+    property bool hasPowerNowChecked: false
     
     preferredRepresentation: fullRepresentation
     
@@ -207,11 +208,12 @@ PlasmoidItem {
 
                 updateEnergyUsage()
                 dataSource.disconnectSource(sourceName)
-            } else if (sourceName.includes("/power_now")) {
-                root.hasPowerNow = (data["exit code"] === 0)
-                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-                dataSource.disconnectSource(sourceName)
-            }
+           } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
+    root.hasPowerNow = (data["exit code"] === 0)
+    console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
+    hasPowerNowChecked = true
+    dataSource.disconnectSource(sourceName)
+}
         }
     }
 }
