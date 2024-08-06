@@ -118,7 +118,7 @@ PlasmoidItem {
         if (root.acAdapterPath) {
             dataSource.readFile(root.acAdapterPath + "/online")
         } else {
-            calculateAndDisplayEnergy(false)  // Assume not plugged in if we can't find AC adapter
+            calculateAndDisplayEnergy(false)  
         }
     }
 
@@ -191,7 +191,7 @@ PlasmoidItem {
                     root.batteryPath = "/sys/class/power_supply/" + batteries[0]
                     console.log("Battery found: " + root.batteryPath)
                     
-                    // Check if power_now file exists
+                    
                     dataSource.connectSource("ls " + root.batteryPath + "/power_now")
                 } else {
                     console.error("No battery found")
