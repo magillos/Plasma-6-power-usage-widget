@@ -15,7 +15,7 @@
         "ServiceTypes": [
             "Plasma/Applet"
         ],
-        "Version": "1.0.4",
+        "Version": "1.0.5",
         "Website": "https://github.com/magillos/Plasma-6-power-usage-widget"
     },
     "X-Plasma-API": "declarativeappletscript",
