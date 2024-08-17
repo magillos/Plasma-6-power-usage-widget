@@ -14,6 +14,8 @@ PlasmoidItem {
     property string acAdapterPath: ""
     property bool hasPowerNow: false
     property bool hasPowerNowChecked: false
+    property var batteryPaths: []
+    property int currentBatteryIndex: -1
     
     preferredRepresentation: fullRepresentation
     
@@ -95,6 +97,15 @@ PlasmoidItem {
         } else if (source.includes("online")) {
             var acOnline = parseInt(content, 10) === 1
             calculateAndDisplayEnergy(acOnline)
+        } else if (source.includes("present")) {
+            var isPresent = parseInt(content, 10) === 1
+            if (isPresent) {
+                root.batteryPath = root.batteryPaths[root.currentBatteryIndex]
+                console.log("Using battery: " + root.batteryPath)
+                updateEnergyUsage()
+            } else {
+                findNextAvailableBattery()
+            }
         }
     }
 
@@ -156,6 +167,22 @@ PlasmoidItem {
         }
     }
 
+    function findNextAvailableBattery() {
+        root.currentBatteryIndex++
+        if (root.currentBatteryIndex < root.batteryPaths.length) {
+            checkBatteryPresence()
+        } else {
+            console.error("No available battery found")
+            root.energyText = "No battery"
+            root.energyTextColor = Kirigami.Theme.negativeTextColor
+        }
+    }
+
+    function checkBatteryPresence() {
+        var path = root.batteryPaths[root.currentBatteryIndex]
+        dataSource.readFile(path + "/present")
+    }
+
     Timer {
         id: updateTimer
         interval: plasmoid.configuration.updateInterval
@@ -180,19 +207,18 @@ PlasmoidItem {
         function onNewData(sourceName, data) {
             if (sourceName === "ls /sys/class/power_supply") {
                 var devices = data.stdout.split('\n')
-                var batteries = devices.filter(function(item) {
+                root.batteryPaths = devices.filter(function(item) {
                     return item.startsWith('BAT')
+                }).map(function(item) {
+                    return "/sys/class/power_supply/" + item
                 })
                 var acAdapters = devices.filter(function(item) {
                     return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
-                if (batteries.length > 0) {
-                    root.batteryPath = "/sys/class/power_supply/" + batteries[0]
-                    console.log("Battery found: " + root.batteryPath)
-                    
-                    
-                    dataSource.connectSource("ls " + root.batteryPath + "/power_now")
+                if (root.batteryPaths.length > 0) {
+                    root.currentBatteryIndex = 0
+                    checkBatteryPresence()
                 } else {
                     console.error("No battery found")
                     root.energyText = "No battery"
@@ -206,14 +232,13 @@ PlasmoidItem {
                     console.warn("No AC adapter found")
                 }
 
-                updateEnergyUsage()
                 dataSource.disconnectSource(sourceName)
-           } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
-    root.hasPowerNow = (data["exit code"] === 0)
-    console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-    hasPowerNowChecked = true
-    dataSource.disconnectSource(sourceName)
-}
+            } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
+                root.hasPowerNow = (data["exit code"] === 0)
+                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
+                hasPowerNowChecked = true
+                dataSource.disconnectSource(sourceName)
+            }
         }
     }
 }
