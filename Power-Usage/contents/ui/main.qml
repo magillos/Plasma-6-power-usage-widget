@@ -14,6 +14,7 @@ PlasmoidItem {
     property string acAdapterPath: ""
     property bool hasPowerNow: false
     property bool hasPowerNowChecked: false
+    property var errorFlags: ({})
     
     preferredRepresentation: fullRepresentation
     
@@ -52,7 +53,10 @@ PlasmoidItem {
             if (exitCode == 0) {
                 root.processFileContent(sourceName, stdout.trim())
             } else {
-                console.error("Error reading file:", sourceName, "stderr:", stderr)
+                if (!root.errorFlags[sourceName]) {
+                    console.error("Error reading file:", sourceName, "stderr:", stderr)
+                    root.errorFlags[sourceName] = true
+                }
                 root.processFileContent(sourceName, null)
             }
 
@@ -188,32 +192,56 @@ PlasmoidItem {
                 })
 
                 if (batteries.length > 0) {
-                    root.batteryPath = "/sys/class/power_supply/" + batteries[0]
-                    console.log("Battery found: " + root.batteryPath)
+                    // Prioritize BAT1 if available, otherwise use BAT0
+                    var selectedBattery = batteries.find(bat => bat === 'BAT1') || batteries[0]
+                    var newBatteryPath = "/sys/class/power_supply/" + selectedBattery
                     
-                    
-                    dataSource.connectSource("ls " + root.batteryPath + "/power_now")
+                    if (newBatteryPath !== root.batteryPath) {
+                        root.batteryPath = newBatteryPath
+                        console.log("Selected battery: " + root.batteryPath)
+                        root.errorFlags = {} // Reset error flags when battery changes
+                        root.hasPowerNowChecked = false
+                        dataSource.connectSource("ls " + root.batteryPath + "/power_now")
+                    }
                 } else {
-                    console.error("No battery found")
+                    if (!root.errorFlags["no_battery"]) {
+                        console.error("No battery found")
+                        root.errorFlags["no_battery"] = true
+                    }
                     root.energyText = "No battery"
                     root.energyTextColor = Kirigami.Theme.negativeTextColor
                 }
 
                 if (acAdapters.length > 0) {
-                    root.acAdapterPath = "/sys/class/power_supply/" + acAdapters[0]
-                    console.log("AC adapter found: " + root.acAdapterPath)
+                    var newAcAdapterPath = "/sys/class/power_supply/" + acAdapters[0]
+                    if (newAcAdapterPath !== root.acAdapterPath) {
+                        root.acAdapterPath = newAcAdapterPath
+                        console.log("AC adapter found: " + root.acAdapterPath)
+                    }
                 } else {
-                    console.warn("No AC adapter found")
+                    if (!root.errorFlags["no_ac_adapter"]) {
+                        console.warn("No AC adapter found")
+                        root.errorFlags["no_ac_adapter"] = true
+                    }
                 }
 
                 updateEnergyUsage()
                 dataSource.disconnectSource(sourceName)
-           } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
-    root.hasPowerNow = (data["exit code"] === 0)
-    console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-    hasPowerNowChecked = true
-    dataSource.disconnectSource(sourceName)
-}
+            } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
+                root.hasPowerNow = (data["exit code"] === 0)
+                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
+                hasPowerNowChecked = true
+                dataSource.disconnectSource(sourceName)
+            }
         }
+    }
+
+    // Add a timer to periodically check for battery changes
+    Timer {
+        id: batteryCheckTimer
+        interval: 5000 // Check every 5 seconds
+        running: true
+        repeat: true
+        onTriggered: findPowerSupplyPaths()
     }
 }
