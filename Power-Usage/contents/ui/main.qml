@@ -45,14 +45,12 @@ PlasmoidItem {
 
         onNewData: (sourceName, data) => {
             var exitCode = data["exit code"]
-            var exitStatus = data["exit status"]
             var stdout = data["stdout"]
-            var stderr = data["stderr"]
 
             if (exitCode == 0) {
                 root.processFileContent(sourceName, stdout.trim())
             } else {
-                console.error("Error reading file:", sourceName, "stderr:", stderr)
+                console.error("Error reading file:", sourceName)
                 root.processFileContent(sourceName, null)
             }
 
@@ -63,7 +61,7 @@ PlasmoidItem {
     property var batteryData: ({})
 
     function processFileContent(source, content) {
-        var batteryIndex = source.includes("BAT0") ? 0 : (source.includes("BAT1") ? 1 : -1)
+        var batteryIndex = root.batteryPaths.findIndex(path => source.includes(path))
         
         if (source.includes("status")) {
             if (batteryIndex !== -1) {
@@ -111,6 +109,8 @@ PlasmoidItem {
         } else if (source.includes("online")) {
             var acOnline = parseInt(content, 10) === 1
             calculateAndDisplayEnergy(acOnline)
+        } else if (source === "ls /sys/class/power_supply") {
+            updatePowerSupplyPaths(content)
         }
     }
 
@@ -164,7 +164,48 @@ PlasmoidItem {
         }
     }
 
-    function findPowerSupplyPaths() {
+    function updatePowerSupplyPaths(content) {
+        var devices = content.split('\n')
+        var newBatteryPaths = devices.filter(item => item.startsWith('BAT'))
+            .map(bat => "/sys/class/power_supply/" + bat)
+        
+        var acAdapters = devices.filter(item => item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB'))
+
+        var pathsChanged = JSON.stringify(newBatteryPaths) !== JSON.stringify(root.batteryPaths)
+        var acChanged = acAdapters.length > 0 && "/sys/class/power_supply/" + acAdapters[0] !== root.acAdapterPath
+
+        if (pathsChanged) {
+            console.log("Battery configuration changed. Resetting state.")
+            root.batteryPaths = newBatteryPaths
+            root.batteryData = {}
+            root.hasPowerNow = false
+            root.hasPowerNowChecked = false
+
+            if (root.batteryPaths.length > 0) {
+                console.log("Batteries found: " + root.batteryPaths.join(", "))
+                root.batteryPaths.forEach(function(path) {
+                    if (!root.hasPowerNowChecked) {
+                        dataSource.readFile(path + "/power_now")
+                    }
+                })
+            } else {
+                console.error("No battery found")
+                root.energyText = "No battery"
+                root.energyTextColor = Kirigami.Theme.negativeTextColor
+            }
+        }
+
+        if (acChanged) {
+            root.acAdapterPath = "/sys/class/power_supply/" + acAdapters[0]
+            console.log("AC adapter found: " + root.acAdapterPath)
+        }
+
+        if (pathsChanged || acChanged) {
+            updateEnergyUsage()
+        }
+    }
+
+    function checkPowerSupplyChanges() {
         dataSource.connectSource("ls /sys/class/power_supply")
     }
 
@@ -172,7 +213,7 @@ PlasmoidItem {
         if (root.batteryPaths.length > 0) {
             root.batteryPaths.forEach(path => dataSource.readFile(path + "/status"))
         } else {
-            findPowerSupplyPaths()
+            checkPowerSupplyChanges()
         }
     }
 
@@ -184,59 +225,22 @@ PlasmoidItem {
         onTriggered: updateEnergyUsage()
     }
 
+    Timer {
+        id: checkDevicesTimer
+        interval: 10000 // Check for device changes every 10 seconds
+        running: true
+        repeat: true
+        onTriggered: checkPowerSupplyChanges()
+    }
+
     Component.onCompleted: {
-        findPowerSupplyPaths()
+        checkPowerSupplyChanges()
     }
 
     Connections {
         target: plasmoid.configuration
         function onUpdateIntervalChanged() {
             updateTimer.interval = plasmoid.configuration.updateInterval
-        }
-    }
-
-    Connections {
-        target: dataSource
-        function onNewData(sourceName, data) {
-            if (sourceName === "ls /sys/class/power_supply") {
-                var devices = data.stdout.split('\n')
-                var batteries = devices.filter(function(item) {
-                    return item.startsWith('BAT')
-                })
-                var acAdapters = devices.filter(function(item) {
-                    return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
-                })
-
-                if (batteries.length > 0) {
-                    root.batteryPaths = batteries.map(function(bat) {
-                        return "/sys/class/power_supply/" + bat
-                    })
-                    console.log("Batteries found: " + root.batteryPaths.join(", "))
-                    
-                    root.batteryPaths.forEach(function(path, index) {
-                        dataSource.connectSource("ls " + path + "/power_now")
-                    })
-                } else {
-                    console.error("No battery found")
-                    root.energyText = "No battery"
-                    root.energyTextColor = Kirigami.Theme.negativeTextColor
-                }
-
-                if (acAdapters.length > 0) {
-                    root.acAdapterPath = "/sys/class/power_supply/" + acAdapters[0]
-                    console.log("AC adapter found: " + root.acAdapterPath)
-                } else {
-                    console.warn("No AC adapter found")
-                }
-
-                updateEnergyUsage()
-                dataSource.disconnectSource(sourceName)
-            } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
-                root.hasPowerNow = (data["exit code"] === 0)
-                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-                hasPowerNowChecked = true
-                dataSource.disconnectSource(sourceName)
-            }
         }
     }
 }
