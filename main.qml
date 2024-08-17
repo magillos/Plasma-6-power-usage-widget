@@ -183,16 +183,14 @@ PlasmoidItem {
                 var batteries = devices.filter(function(item) {
                     return item.startsWith('BAT')
                 })
-                var sortedBatteries = batteries.sort((a, b) => {
-                    return parseInt(b.replace('BAT', '')) - parseInt(a.replace('BAT', ''))
-                })
                 var acAdapters = devices.filter(function(item) {
                     return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
-                if (sortedBatteries.length > 0) {
-                    root.batteryPath = "/sys/class/power_supply/" + sortedBatteries[0]
+                if (batteries.length > 0) {
+                    root.batteryPath = "/sys/class/power_supply/" + batteries[0]
                     console.log("Battery found: " + root.batteryPath)
+                    
                     
                     dataSource.connectSource("ls " + root.batteryPath + "/power_now")
                 } else {
@@ -210,12 +208,12 @@ PlasmoidItem {
 
                 updateEnergyUsage()
                 dataSource.disconnectSource(sourceName)
-            } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
-                root.hasPowerNow = (data["exit code"] === 0)
-                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-                hasPowerNowChecked = true
-                dataSource.disconnectSource(sourceName)
-            }
+           } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
+    root.hasPowerNow = (data["exit code"] === 0)
+    console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
+    hasPowerNowChecked = true
+    dataSource.disconnectSource(sourceName)
+}
         }
     }
 }
