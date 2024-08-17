@@ -14,6 +14,7 @@ PlasmoidItem {
     property string acAdapterPath: ""
     property bool hasPowerNow: false
     property bool hasPowerNowChecked: false
+    property var batteryPaths: []
     
     preferredRepresentation: fullRepresentation
     
@@ -183,16 +184,19 @@ PlasmoidItem {
                 var batteries = devices.filter(function(item) {
                     return item.startsWith('BAT')
                 })
-                var sortedBatteries = batteries.sort((a, b) => {
-                    return parseInt(b.replace('BAT', '')) - parseInt(a.replace('BAT', ''))
-                })
                 var acAdapters = devices.filter(function(item) {
                     return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
-                if (sortedBatteries.length > 0) {
-                    root.batteryPath = "/sys/class/power_supply/" + sortedBatteries[0]
-                    console.log("Battery found: " + root.batteryPath)
+                if (batteries.length > 0) {
+                    root.batteryPaths = batteries.map(function(bat) {
+                        return "/sys/class/power_supply/" + bat
+                    })
+                    root.batteryPaths.sort(function(a, b) {
+                        return parseInt(b.match(/\d+/)[0]) - parseInt(a.match(/\d+/)[0])
+                    })
+                    root.batteryPath = root.batteryPaths[0]
+                    console.log("Highest numbered battery found: " + root.batteryPath)
                     
                     dataSource.connectSource("ls " + root.batteryPath + "/power_now")
                 } else {
@@ -217,5 +221,13 @@ PlasmoidItem {
                 dataSource.disconnectSource(sourceName)
             }
         }
+    }
+
+    Timer {
+        id: batteryCheckTimer
+        interval: 5000 // Check for battery changes every 5 seconds
+        running: true
+        repeat: true
+        onTriggered: findPowerSupplyPaths()
     }
 }
