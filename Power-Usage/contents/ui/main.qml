@@ -10,7 +10,7 @@ PlasmoidItem {
     
     property string energyText: "-- W" 
     property color energyTextColor: Kirigami.Theme.textColor 
-    property var batteryPaths: []
+    property string activeBatteryPath: ""
     property string acAdapterPath: ""
     property bool hasPowerNow: false
     property bool hasPowerNowChecked: false
@@ -74,59 +74,44 @@ PlasmoidItem {
                 root.energyTextColor = Kirigami.Theme.negativeTextColor
                 return
             }
-            voltageValues.push(parseFloat(content) / 1000000)
-            if (voltageValues.length === root.batteryPaths.length) {
-                readCurrent()
-            }
+            voltageValue = parseFloat(content) / 1000000
+            readCurrent()
         } else if (source.includes("current_now")) {
             if (content === null) {
                 root.energyText = "Reading current"
                 root.energyTextColor = Kirigami.Theme.negativeTextColor
                 return
             }
-            currentValues.push(parseFloat(content) / 1000000)
-            if (currentValues.length === root.batteryPaths.length) {
-                readACOnline()
-            }
+            currentValue = parseFloat(content) / 1000000
+            readACOnline()
         } else if (source.includes("power_now")) {
             if (content === null) {
                 root.energyText = "Reading power"
                 root.energyTextColor = Kirigami.Theme.negativeTextColor
                 return
             }
-            powerValues.push(parseFloat(content) / 1000000)
-            if (powerValues.length === root.batteryPaths.length) {
-                readACOnline()
-            }
+            powerValue = parseFloat(content) / 1000000
+            readACOnline()
         } else if (source.includes("online")) {
             var acOnline = parseInt(content, 10) === 1
             calculateAndDisplayEnergy(acOnline)
         }
     }
 
-    property var voltageValues: []
-    property var currentValues: []
-    property var powerValues: []
+    property real voltageValue: 0
+    property real currentValue: 0
+    property real powerValue: 0
 
     function readVoltage() {
-        voltageValues = []
-        for (var i = 0; i < root.batteryPaths.length; i++) {
-            dataSource.readFile(root.batteryPaths[i] + "/voltage_now")
-        }
+        dataSource.readFile(root.activeBatteryPath + "/voltage_now")
     }
 
     function readCurrent() {
-        currentValues = []
-        for (var i = 0; i < root.batteryPaths.length; i++) {
-            dataSource.readFile(root.batteryPaths[i] + "/current_now")
-        }
+        dataSource.readFile(root.activeBatteryPath + "/current_now")
     }
 
     function readPowerNow() {
-        powerValues = []
-        for (var i = 0; i < root.batteryPaths.length; i++) {
-            dataSource.readFile(root.batteryPaths[i] + "/power_now")
-        }
+        dataSource.readFile(root.activeBatteryPath + "/power_now")
     }
 
     function readACOnline() {
@@ -138,14 +123,8 @@ PlasmoidItem {
     }
 
     function calculateAndDisplayEnergy(acOnline) {
-        var totalWatts = 0
-        var isFullyCharged = true
-
-        for (var i = 0; i < root.batteryPaths.length; i++) {
-            var watts = root.hasPowerNow ? powerValues[i] : voltageValues[i] * currentValues[i]
-            totalWatts += watts
-            isFullyCharged = isFullyCharged && (root.hasPowerNow ? (watts < 0.1) : (Math.abs(currentValues[i]) < 0.01))
-        }
+        var watts = root.hasPowerNow ? powerValue : voltageValue * currentValue
+        var isFullyCharged = root.hasPowerNow ? (watts < 0.1) : (Math.abs(currentValue) < 0.01)
 
         if (isFullyCharged && acOnline) {
             root.energyText = "\u26A1"
@@ -153,12 +132,12 @@ PlasmoidItem {
         } else {
             var formattedWatts
             if (acOnline) {
-                formattedWatts = totalWatts.toLocaleString(Qt.locale(), 'f', 1) + "W"
+                formattedWatts = watts.toLocaleString(Qt.locale(), 'f', 1) + "W"
                 root.energyTextColor = Kirigami.Theme.textColor
             } else {
-                formattedWatts = "-" + Math.abs(totalWatts).toLocaleString(Qt.locale(), 'f', 1) + "W"
+                formattedWatts = "-" + Math.abs(watts).toLocaleString(Qt.locale(), 'f', 1) + "W"
                 var threshold = plasmoid.configuration.wattageThreshold
-                root.energyTextColor = totalWatts >= threshold ? "red" : Kirigami.Theme.textColor
+                root.energyTextColor = watts >= threshold ? "red" : Kirigami.Theme.textColor
             }
             
             root.energyText = formattedWatts + (acOnline ? "\u26A1" : "")
@@ -170,8 +149,8 @@ PlasmoidItem {
     }
 
     function updateEnergyUsage() {
-        if (root.batteryPaths.length > 0) {
-            dataSource.readFile(root.batteryPaths[0] + "/status")
+        if (root.activeBatteryPath) {
+            dataSource.readFile(root.activeBatteryPath + "/status")
         } else {
             findPowerSupplyPaths()
         }
@@ -208,14 +187,19 @@ PlasmoidItem {
                     return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
-                root.batteryPaths = batteries.map(function(battery) {
-                    return "/sys/class/power_supply/" + battery
-                })
+                // Prioritize BAT1 over BAT0
+                if (batteries.includes('BAT1')) {
+                    root.activeBatteryPath = "/sys/class/power_supply/BAT1"
+                } else if (batteries.includes('BAT0')) {
+                    root.activeBatteryPath = "/sys/class/power_supply/BAT0"
+                } else {
+                    root.activeBatteryPath = ""
+                }
 
-                if (root.batteryPaths.length > 0) {
-                    console.log("Batteries found: " + root.batteryPaths.join(", "))
+                if (root.activeBatteryPath) {
+                    console.log("Active battery: " + root.activeBatteryPath)
                     
-                    dataSource.connectSource("ls " + root.batteryPaths[0] + "/power_now")
+                    dataSource.connectSource("ls " + root.activeBatteryPath + "/power_now")
                 } else {
                     console.error("No battery found")
                     root.energyText = "No battery"
