@@ -10,7 +10,7 @@ PlasmoidItem {
     
     property string energyText: "-- W" 
     property color energyTextColor: Kirigami.Theme.textColor 
-    property string activeBatteryPath: ""
+    property string batteryPath: ""
     property string acAdapterPath: ""
     property bool hasPowerNow: false
     property bool hasPowerNowChecked: false
@@ -103,15 +103,15 @@ PlasmoidItem {
     property real powerValue: 0
 
     function readVoltage() {
-        dataSource.readFile(root.activeBatteryPath + "/voltage_now")
+        dataSource.readFile(root.batteryPath + "/voltage_now")
     }
 
     function readCurrent() {
-        dataSource.readFile(root.activeBatteryPath + "/current_now")
+        dataSource.readFile(root.batteryPath + "/current_now")
     }
 
     function readPowerNow() {
-        dataSource.readFile(root.activeBatteryPath + "/power_now")
+        dataSource.readFile(root.batteryPath + "/power_now")
     }
 
     function readACOnline() {
@@ -149,8 +149,8 @@ PlasmoidItem {
     }
 
     function updateEnergyUsage() {
-        if (root.activeBatteryPath) {
-            dataSource.readFile(root.activeBatteryPath + "/status")
+        if (root.batteryPath) {
+            dataSource.readFile(root.batteryPath + "/status")
         } else {
             findPowerSupplyPaths()
         }
@@ -187,19 +187,12 @@ PlasmoidItem {
                     return item.startsWith('AC') || item.startsWith('ADP') || item.startsWith('USB')
                 })
 
-                // Prioritize BAT1 over BAT0
-                if (batteries.includes('BAT1')) {
-                    root.activeBatteryPath = "/sys/class/power_supply/BAT1"
-                } else if (batteries.includes('BAT0')) {
-                    root.activeBatteryPath = "/sys/class/power_supply/BAT0"
-                } else {
-                    root.activeBatteryPath = ""
-                }
-
-                if (root.activeBatteryPath) {
-                    console.log("Active battery: " + root.activeBatteryPath)
+                if (batteries.length > 0) {
+                    root.batteryPath = "/sys/class/power_supply/" + batteries[0]
+                    console.log("Battery found: " + root.batteryPath)
                     
-                    dataSource.connectSource("ls " + root.activeBatteryPath + "/power_now")
+                    
+                    dataSource.connectSource("ls " + root.batteryPath + "/power_now")
                 } else {
                     console.error("No battery found")
                     root.energyText = "No battery"
@@ -215,12 +208,12 @@ PlasmoidItem {
 
                 updateEnergyUsage()
                 dataSource.disconnectSource(sourceName)
-            } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
-                root.hasPowerNow = (data["exit code"] === 0)
-                console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
-                hasPowerNowChecked = true
-                dataSource.disconnectSource(sourceName)
-            }
+           } else if (sourceName.includes("/power_now") && !hasPowerNowChecked) {
+    root.hasPowerNow = (data["exit code"] === 0)
+    console.log("Device " + (root.hasPowerNow ? "has" : "does not have") + " power_now file")
+    hasPowerNowChecked = true
+    dataSource.disconnectSource(sourceName)
+}
         }
     }
 }
